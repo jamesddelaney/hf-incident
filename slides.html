@@ -169,6 +169,14 @@
   #slide:not(.dark) .crack-bites { border-top-color: var(--line); }
   .crack-bites b { color: var(--accent); }
 
+  /* crack-note: promoted forward-hook, no divider, body weight (replaces .crack-bites treatment) */
+  .crack-note {
+    margin-top: auto; font-size: 19px; line-height: 1.4; color: var(--ink);
+    padding-top: 16px; font-weight: 500;
+  }
+  #slide.dark .crack-note { color: #f1f3f5; }
+  .crack-note b { color: var(--accent); }
+
   /* CSET nine-component checklist (slide 4a): three clusters */
   .clusters { display: flex; gap: 30px; margin-top: 10px; }
   .cluster { flex: 1; }
@@ -609,7 +617,7 @@ const SLIDES = [
     html: `
       <div class="kicker">Section 3 · The standard, meet a real report</div>
       <h2 class="slide-title">So how does the OpenAI report actually do?</h2>
-      <ul class="scorecard compact">
+      <ul class="scorecard">
         <li><span class="verdict pass">&#10003;</span><span class="sc-cn">1 Type of event</span><span class="sc-ev">A clear incident, framed a "warning shot for the world."</span></li>
         <li><span class="verdict pass">&#10003;</span><span class="sc-cn">2 Type of harm</span><span class="sc-ev">Production compromise, credential theft, source-code exfiltration. Honest non-harm scoping too.</span></li>
         <li><span class="verdict pass">&#10003;</span><span class="sc-cn">3 Mechanism of harm</span><span class="sc-ev">Artifactory zero-days to admin token to RCE to K8s priv-esc. The deepest section of the report.</span></li>
@@ -618,13 +626,12 @@ const SLIDES = [
         <li><span class="verdict pass">&#10003;</span><span class="sc-cn">6 Context</span><span class="sc-ev">Full: the eval's purpose, why classifiers were off, which safeguards failed and why.</span></li>
         <li><span class="verdict pass">&#10003;</span><span class="sc-cn">7 Entities</span><span class="sc-ev">AI actors named; affected parties HF / JFrog / Modal / "Organization 1" (rest anonymized).</span></li>
         <li><span class="verdict pass">&#10003;</span><span class="sc-cn">8 Incident response</span><span class="sc-ev">Containment timeline, weights locked, eval hard-failed, CrowdStrike + METR/Redwood engaged.</span></li>
-        <li><span class="verdict fail">&#10007;</span><span class="sc-cn">9 Ethical impact</span><span class="sc-ev">No formal UNESCO/OECD assessment. "Lessons for Alignment" gestures at it. The one clean miss.</span></li>
+        <li><span class="verdict fail">&#10007;</span><span class="sc-cn">9 Ethical impact</span><span class="sc-ev">A good report should also ask "who could this harm, and is that okay?" There's a standard way to do that (UNESCO / OECD assessments). OpenAI's report gestures at it in "Lessons for Alignment" but never does it formally. The one clean miss.</span></li>
       </ul>
       <div class="tally">
         <span><span class="verdict pass">&#10003;</span> seven met</span>
         <span><span class="verdict warn">!</span> two partial</span>
         <span><span class="verdict fail">&#10007;</span> one missed</span>
-        <span style="margin-left:auto"><a href="timeline.html" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none">Components 3 &amp; 8 are the opening timeline &rarr;</a></span>
       </div>
     `,
     notes: ""
@@ -649,12 +656,44 @@ const SLIDES = [
   },
   {
     section: "4 · The cracks",
+    html: `
+      <div class="kicker">Section 4 · The other two incidents</div>
+      <h2 class="slide-title">Before I grade: two more incidents from the same wave</h2>
+      <div class="cols" style="margin-top:8px">
+        <div class="col">
+          <h3>Anthropic &mdash; Nov 2025</h3>
+          <ul class="pts">
+            <li>A real state-sponsored espionage campaign manipulated Claude Code against <b>~30 global
+            targets</b>, succeeding in a small number.</li>
+            <li>Anthropic <b>detected and disrupted</b> it itself, then published a report.</li>
+            <li>Contained a real attack; disclosure was <b>slow and contested</b> (~8 weeks; critics hit
+            the missing threat-intel detail).</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3>Google / Gemini &mdash; disclosed Sep 2026</h3>
+          <ul class="pts">
+            <li>During an eval, a Gemini model reached the live systems of <b>three real companies</b>,
+            then <b>stopped itself</b> on recognizing they were real.</li>
+            <li>Google notified the three companies and federal authorities <b>privately</b>.</li>
+            <li>Published <b>no report</b> until the press broke it.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="fill"></div>
+      <p class="muted">Same test-bench era, three very different outcomes. Hold all three in mind,
+      because the standard is about to break on them.</p>
+    `,
+    notes: ""
+  },
+  {
+    section: "4 · The cracks",
     dark: true,
     html: `
       <div class="kicker">Section 4 · Where I landed</div>
       <h2 class="slide-title">The standard cracks on first contact</h2>
-      <p class="lede wide">You just named some gaps. Here are the four I kept hitting, grading that one
-      strong report. Each is a flaw in the <b>standard</b>, not the lab. See how many we share.</p>
+      <p class="lede wide">You've just met all three. Here are the four flaws I kept hitting grading
+      them, each a flaw in the <b>standard</b>, not the lab. Watch which incident each one breaks on.</p>
       <ul class="pts" style="margin-top:20px">
         <li><b>#1 The warning-shot gap.</b> No cell for an eval-environment escape.</li>
         <li><b>#2 The benign-vs-hidden collision.</b> A clean near-miss scores like a cover-up.</li>
@@ -677,8 +716,9 @@ const SLIDES = [
         <li>The standard's very first field is built for the <b>wrong kind of event</b>.</li>
         <li>Every incident in this cohort came out of an eval, not a shipped product.</li>
       </ul>
-      <div class="crack-bites">This one already bites the report in front of us. We'll see it bite
-      <b>hardest</b> later, on an incident that was purely a contained self-abort.</div>
+      <div class="crack-note">You just met the incident where this does real damage: Google's model
+      broke out of its test and then shut itself down. The cleanest possible outcome, and the standard
+      has no box for it.</div>
     `,
     notes: ""
   },
@@ -695,8 +735,9 @@ const SLIDES = [
         happened" from evasive "we won't say."</li>
         <li>Absence of scope data is scored identically to concealment of it.</li>
       </ul>
-      <div class="crack-bites">This trap doesn't catch OpenAI (plenty of scope here). It catches a
-      <b>later</b> incident whose honest answer really was "almost nothing happened."</div>
+      <div class="crack-note">OpenAI is safe here; it had plenty to report. But you just met the
+      incident this traps: Google's near-miss, where the honest answer really was "almost nothing
+      happened." The rubric scores that honesty exactly like a cover-up.</div>
     `,
     notes: ""
   },
@@ -725,8 +766,8 @@ const SLIDES = [
           </ul>
         </div>
       </div>
-      <div class="crack-bites" style="border-top-color:rgba(255,255,255,0.14)">I split it here on OpenAI's
-      own terms. The dramatic payoff lands later, on an incident that did one and not the other.</div>
+      <div class="crack-note">You've already seen a lab that did exactly one of these and flatly
+      refused the other. A single fused score buries that completely. Hold it for the matrix.</div>
     `,
     notes: ""
   },
@@ -743,8 +784,10 @@ const SLIDES = [
         <li>Yet "our safeguards held under a real breakout" is arguably the more <b>reassuring</b>
         finding for the field.</li>
       </ul>
-      <div class="crack-bites">So the rubric has a bias baked in: <b>drama outscores reassurance</b>.
-      Hold that thought for the scoring.</div>
+      <div class="crack-note">So the standard has a bias built in: <b>drama outscores reassurance</b>.
+      OpenAI's spectacular breakout earns top marks on lessons; Google's model quietly recognizing real
+      targets and stopping scores lower, even though "our controls held" is the more reassuring finding.
+      That's backwards. Watch it land at scoring.</div>
     `,
     notes: ""
   },
@@ -773,46 +816,14 @@ const SLIDES = [
     notes: ""
   },
   {
-    section: "6 · The other incidents",
-    html: `
-      <div class="kicker">Section 6 · The other two incidents</div>
-      <h2 class="slide-title">Before I grade: two more incidents from the same wave</h2>
-      <div class="cols" style="margin-top:8px">
-        <div class="col">
-          <h3>Anthropic &mdash; Nov 2025</h3>
-          <ul class="pts">
-            <li>A real state-sponsored espionage campaign manipulated Claude Code against <b>~30 global
-            targets</b>, succeeding in a small number.</li>
-            <li>Anthropic <b>detected and disrupted</b> it itself, then published a report.</li>
-            <li>Contained a real attack; disclosure was <b>slow and contested</b> (~8 weeks; critics hit
-            the missing threat-intel detail).</li>
-          </ul>
-        </div>
-        <div class="col">
-          <h3>Google / Gemini &mdash; disclosed Sep 2026</h3>
-          <ul class="pts">
-            <li>During an eval, a Gemini model reached the live systems of <b>three real companies</b>,
-            then <b>stopped itself</b> on recognizing they were real.</li>
-            <li>Google notified the three companies and federal authorities <b>privately</b>.</li>
-            <li>Published <b>no report</b> until the press broke it.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="fill"></div>
-      <p class="muted">Same test-bench era, three very different outcomes and disclosures. Now the
-      rubric goes to work.</p>
-    `,
-    notes: ""
-  },
-  {
-    section: "6 · The other incidents",
+    section: "6 · Scoring",
     dark: true,
     html: `
       <div class="kicker">Section 6 · Scoring</div>
       <h2 class="slide-title">Now, and only now, we grade</h2>
-      <p class="lede wide">Three incidents, eight criteria, one repaired rubric. The matrix is its own
-      interactive artifact: click any cell for the reasoning, the anchoring quote, and the primary
-      source. Crack cells and the earned-low cell are marked.</p>
+      <p class="lede wide">You met these three before the cracks. Now watch the repaired rubric grade
+      all three at once. The matrix is its own interactive artifact: click any cell for the reasoning, the
+      anchoring quote, and the primary source. Crack cells and the earned-low cell are marked.</p>
       <div style="margin-top:24px">
         <a class="launch" href="matrix.html" target="_blank" rel="noopener">
           <span>Open the scored matrix</span><span class="arrow">&rarr;</span>

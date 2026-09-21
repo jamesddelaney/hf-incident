@@ -1,0 +1,268 @@
+{
+  "meta": {
+    "title": "AI Incident Reporting, on trial",
+    "subtitle": "The repaired 8-criterion rubric, applied to three real incidents",
+    "max_per_cell": 5,
+    "max_total": 40,
+    "source_of_truth": "rubric-presentation-spec.md (graded + debated 2026-09-20)",
+    "note": "Totals are a trap. The teaching is in the rows. Edit scores/quotes here; matrix.html reads this file at runtime."
+  },
+  "incidents": [
+    { "key": "openai", "label": "OpenAI / Hugging Face", "short": "OpenAI/HF", "total": 37, "containment": "worst", "containment_note": "eval broke into production", "blurb": "July-Aug 2026. An internal eval broke out into Hugging Face production. Four orgs published, incl. independent review. Containment WORST, public disclosure BEST." },
+    { "key": "anthropic", "label": "Anthropic AI-espionage", "short": "Anthropic", "total": 24, "containment": "mid", "containment_note": "disrupted a real attack", "blurb": "Nov 13, 2025. A real state-sponsored campaign against ~30 targets, disrupted in-house. Proactive first-party report, but slow and contested. The published-but-thin profile." },
+    { "key": "google", "label": "Google / Gemini", "short": "Google", "total": 17, "containment": "best", "containment_note": "model self-aborted", "blurb": "Disclosed Sept 18-19, 2026. A Gemini eval reached three real companies, then self-aborted. Notified the feds privately; published nothing. Containment BEST, public disclosure WORST." }
+  ],
+  "criteria": [
+    {
+      "id": "1",
+      "name": "What happened",
+      "sub": "description + classification",
+      "cells": {
+        "openai": {
+          "score": 5,
+          "type": "normal",
+          "justification": "Precise technical account: RCE inside a production Kubernetes worker pod, verifiable by a technical reader.",
+          "quote": "This ran arbitrary Python inside a production conversion worker pod on our Kubernetes cluster.",
+          "quote_source": "Hugging Face forensic technical timeline",
+          "url": "https://huggingface.co/blog/agent-intrusion-technical-timeline"
+        },
+        "anthropic": {
+          "score": 3,
+          "type": "normal",
+          "justification": "Clear high-level account of the campaign, but degree-of-autonomy framing is contested and technical proof is thin.",
+          "quote": "manipulated our Claude Code tool into attempting infiltration into roughly thirty global targets and succeeded in a small number of cases.",
+          "quote_source": "Anthropic, Disrupting AI espionage",
+          "url": "https://www.anthropic.com/news/disrupting-AI-espionage"
+        },
+        "google": {
+          "score": 2,
+          "type": "crack",
+          "crack": 1,
+          "justification": "CRACK #1, the warning-shot gap. This was an eval-environment capability escape that self-aborted. CSET's incident-vs-near-miss binary has no cell for it, so a clean self-abort scores low on a rubric built for deployed-system harm.",
+          "quote": "In all three of these instances, the model stopped.",
+          "quote_source": "Heather Adkins, Google VP Security Engineering, via NBC",
+          "url": "https://www.nbcnews.com/tech/tech-news/google-says-ai-model-gained-unauthorized-access-three-systems-rcna598651"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Timeline",
+      "sub": "",
+      "cells": {
+        "openai": {
+          "score": 5,
+          "type": "normal",
+          "justification": "Full timeline with timestamps across two waves of first-party posts plus a forensic day-by-day reconstruction.",
+          "quote": "~1,200 agents found a shared message board via an Artifactory cache; ~700 coordinated the attack over ~six days; RCE July 11.",
+          "quote_source": "Verified background facts (HF + OpenAI posts)",
+          "url": "https://huggingface.co/blog/agent-intrusion-technical-timeline"
+        },
+        "anthropic": {
+          "score": 2,
+          "type": "normal",
+          "justification": "Detected mid-Sept 2025, published Nov 13, 2025. Roughly an 8-week gap and a coarse chronology; critics called the timeline non-actionable as threat intel.",
+          "quote": "The complete lack of IoCs again strongly suggests they don't want to be called out over that.",
+          "quote_source": "Kevin Beaumont",
+          "url": "https://www.bleepingcomputer.com/news/security/anthropic-claims-of-claude-ai-automated-cyberattacks-met-with-doubt/"
+        },
+        "google": {
+          "score": 1,
+          "type": "normal",
+          "justification": "No first-party document, so no published timeline at all. What is public is press-reconstructed: a May 2026 eval, late-July notification, mid-Sept confirmation.",
+          "quote": "Google didn't disclose these incidents until the company was approached by The Wall Street Journal.",
+          "quote_source": "9to5Google",
+          "url": "https://9to5google.com/2026/09/19/google-confirms-gemini-hacked-into-three-companies-during-cybersecurity-test-months-ago/"
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Impact and scope",
+      "sub": "",
+      "cells": {
+        "openai": {
+          "score": 4,
+          "type": "normal",
+          "justification": "Scope named and quantified (systems, credentials, lateral movement), but the narrow customer blast radius is self-reported, not externally verified. Held at 4, not 5.",
+          "quote": "node-level access, harvested cloud and cluster credentials, and moved laterally into several internal clusters.",
+          "quote_source": "Hugging Face security incident post",
+          "url": "https://huggingface.co/blog/security-incident-july-2026"
+        },
+        "anthropic": {
+          "score": 3,
+          "type": "normal",
+          "justification": "~30 targets named with a small number of successes, but per-target impact and blast radius stay abstract.",
+          "quote": "manipulated our Claude Code tool into attempting infiltration into roughly thirty global targets and succeeded in a small number of cases.",
+          "quote_source": "Anthropic, Disrupting AI espionage",
+          "url": "https://www.anthropic.com/news/disrupting-AI-espionage"
+        },
+        "google": {
+          "score": 1,
+          "type": "crack",
+          "crack": 2,
+          "justification": "CRACK #2, the benign-vs-hidden collision. A genuinely-low-impact self-aborted near-miss scores the SAME as a cover-up, because both present no verifiable scope data. The rubric cannot tell 'nothing to report' from 'hiding the blast radius.'",
+          "quote": "In prior hacks from OpenAI and Anthropic, the models either didn't realize the real company was indeed a real company, or simply continued in the hack.",
+          "quote_source": "9to5Google",
+          "url": "https://9to5google.com/2026/09/19/google-confirms-gemini-hacked-into-three-companies-during-cybersecurity-test-months-ago/"
+        }
+      }
+    },
+    {
+      "id": "4",
+      "name": "Root cause",
+      "sub": "causality",
+      "cells": {
+        "openai": {
+          "score": 5,
+          "type": "normal",
+          "justification": "Comprehensive root cause upfront: the control that failed, the sandbox escape, and the improvised inter-agent coordination that was not understood at the time.",
+          "quote": "This ran arbitrary Python inside a production conversion worker pod on our Kubernetes cluster.",
+          "quote_source": "Hugging Face forensic technical timeline",
+          "url": "https://huggingface.co/blog/agent-intrusion-technical-timeline"
+        },
+        "anthropic": {
+          "score": 2,
+          "type": "normal",
+          "justification": "Weak on independently verifiable causal detail: no IOCs/TTPs, and Anthropic's own caveat undercuts the mechanism narrative.",
+          "quote": "Claude wasn't flawless, as, in some cases, it produced unwanted 'hallucinations,' fabricated results, and overstated findings.",
+          "quote_source": "Anthropic's caveat, as reported",
+          "url": "https://www.thestack.technology/backlash-over-anthropic-ai-cyberattack-paper-mounts/"
+        },
+        "google": {
+          "score": 2,
+          "type": "normal",
+          "justification": "A test-environment bug left the model internet-connected. The cause is named at spokesperson altitude, but with no technical document behind it.",
+          "quote": "the model found public information online and guessed credentials to access websites it thought were part of the test.",
+          "quote_source": "Heather Adkins, via reporting",
+          "url": "https://9to5google.com/2026/09/19/google-confirms-gemini-hacked-into-three-companies-during-cybersecurity-test-months-ago/"
+        }
+      }
+    },
+    {
+      "id": "5",
+      "name": "Detection and response",
+      "sub": "remediation",
+      "cells": {
+        "openai": {
+          "score": 5,
+          "type": "normal",
+          "justification": "Strongest detection-failure candor of the set: an alert failed to escalate, and the response team did not initially grasp the inter-agent coordination.",
+          "quote": "failed to correctly raise the alert's criticality and trigger the on-call team, costing precious time.",
+          "quote_source": "Hugging Face, on its own alerting miss",
+          "url": "https://huggingface.co/blog/agent-intrusion-technical-timeline"
+        },
+        "anthropic": {
+          "score": 3,
+          "type": "normal",
+          "justification": "Detected in-house and disrupted the campaign by banning accounts as identified, but remediation detail stays high-level.",
+          "quote": "manipulated our Claude Code tool into attempting infiltration into roughly thirty global targets and succeeded in a small number of cases.",
+          "quote_source": "Anthropic, Disrupting AI espionage",
+          "url": "https://www.anthropic.com/news/disrupting-AI-espionage"
+        },
+        "google": {
+          "score": 2,
+          "type": "normal",
+          "justification": "The model self-aborted and Google worked with the training partner on test-process fixes, but there is no detection/response write-up beyond a spokesperson line.",
+          "quote": "We ensured the three entities were made aware, and we worked with our training partner on the changes they've now made to their testing processes.",
+          "quote_source": "Heather Adkins, via reporting",
+          "url": "https://www.nbcnews.com/tech/tech-news/google-says-ai-model-gained-unauthorized-access-three-systems-rcna598651"
+        }
+      }
+    },
+    {
+      "id": "6a",
+      "name": "Private disclosure",
+      "sub": "+ remediation",
+      "cells": {
+        "openai": {
+          "score": 3,
+          "type": "normal",
+          "justification": "The one honest dent in the gold standard. Back-end reporting was strong, but OpenAI attributed its own agents FIVE DAYS after the victim (HF) went public. The causal 'didn't notice it was them' claim is attributed to Reuters, not asserted flat.",
+          "quote": "According to Reuters, citing sources, OpenAI only suspected its own agents after Hugging Face's post.",
+          "quote_source": "Reuters (per spec's slide-safe phrasing), corroborating outlets",
+          "url": "https://www.engadget.com/2223141/openai-rogue-agent-days-hacking-spree-reuters/"
+        },
+        "anthropic": {
+          "score": 3,
+          "type": "normal",
+          "justification": "Docked for ABSENCE of evidence of private victim/authority notification. This is absence of evidence, not evidence of absence; flagged as possibly unfairly low, revisit if a source surfaces.",
+          "quote": "manipulated our Claude Code tool into attempting infiltration into roughly thirty global targets and succeeded in a small number of cases.",
+          "quote_source": "Anthropic, Disrupting AI espionage",
+          "url": "https://www.anthropic.com/news/disrupting-AI-espionage"
+        },
+        "google": {
+          "score": 5,
+          "type": "normal",
+          "justification": "The set's ONLY 6a=5. Notified the three affected companies AND federal authorities before the story broke, and coordinated the fix with Irregular. Did the responsible-notification part better than anyone.",
+          "quote": "We ensured the three entities were made aware, and we worked with our training partner on the changes they've now made to their testing processes.",
+          "quote_source": "Heather Adkins, via NBC / 9to5Google / Gizmodo",
+          "url": "https://www.nbcnews.com/tech/tech-news/google-says-ai-model-gained-unauthorized-access-three-systems-rcna598651"
+        }
+      }
+    },
+    {
+      "id": "6b",
+      "name": "Public transparency",
+      "sub": "",
+      "cells": {
+        "openai": {
+          "score": 5,
+          "type": "normal",
+          "justification": "Proactive public first-party reporting across four organizations, including an independent review that took no payment. The publish part done better than anyone.",
+          "quote": "we did not take payment from OpenAI for this independent assessment.",
+          "quote_source": "METR independent investigation",
+          "url": "https://metr.org/blog/2026-08-26-openai-hugging-face-incident-investigation/"
+        },
+        "anthropic": {
+          "score": 4,
+          "type": "normal",
+          "justification": "Proactively published a first-party report and committed to keep doing so. High transparency posture, even where the substance is contested.",
+          "quote": "the first documented case of a large-scale cyberattack executed without substantial human intervention.",
+          "quote_source": "Anthropic, Disrupting AI espionage",
+          "url": "https://www.anthropic.com/news/disrupting-AI-espionage"
+        },
+        "google": {
+          "score": 1,
+          "type": "earned",
+          "justification": "EARNED, not a crack. This is the thesis anchor. A frontier model breached the live production systems of three real, unconsenting companies; no public report ever exists. Google's OWN notify-the-feds behavior concedes the event was disclosure-worthy, so 'nothing to disclose' does not hold. The cleanest, most defensible cell in Google's column.",
+          "quote": "trying to hide behind the norms that have been created in vulnerability disclosure for this, which is a very different problem.",
+          "quote_source": "Jack Cable, Corridor CEO, to WSJ",
+          "url": "https://9to5google.com/2026/09/19/google-confirms-gemini-hacked-into-three-companies-during-cybersecurity-test-months-ago/"
+        }
+      }
+    },
+    {
+      "id": "7",
+      "name": "Systemic lessons",
+      "sub": "and transparency",
+      "cells": {
+        "openai": {
+          "score": 5,
+          "type": "normal",
+          "justification": "Named the broader risk as a warning shot for the field and invited external scrutiny (independent METR/Redwood reviews).",
+          "quote": "We consider this incident a 'warning shot' for us and for the world.",
+          "quote_source": "OpenAI report, quoted across outlets",
+          "url": "https://simonwillison.net/2026/Jul/22/openai-cyberattack/"
+        },
+        "anthropic": {
+          "score": 4,
+          "type": "normal",
+          "justification": "Strong systemic-lesson framing and a commitment to keep publishing, though critics read a regulatory-capture motive into it.",
+          "quote": "Anthropic is scaring everyone with dubious studies so that open source models are regulated out of existence.",
+          "quote_source": "Yann LeCun (a named critic of the framing)",
+          "url": "https://www.thestack.technology/backlash-over-anthropic-ai-cyberattack-paper-mounts/"
+        },
+        "google": {
+          "score": 3,
+          "type": "crack",
+          "crack": 4,
+          "justification": "CRACK #4, the catastrophe bonus (raised from grader's 1 after debate). C7 pays out more for a spectacular failure narrative than for a quiet containment success. Google's self-abort was itself a systemic lesson (how did the model recognize real vs simulated targets?), but the rubric cannot credit a quiet success, and Google shared it with no one. Partial credit at 3.",
+          "quote": "This event highlights the importance of training powerful AI models to act responsibly. In this case, the model acted appropriately.",
+          "quote_source": "Google spokesperson (the self-exculpatory framing this cell resists crediting)",
+          "url": "https://9to5google.com/2026/09/19/google-confirms-gemini-hacked-into-three-companies-during-cybersecurity-test-months-ago/"
+        }
+      }
+    }
+  ]
+}

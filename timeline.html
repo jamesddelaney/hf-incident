@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Hugging Face Incident timeline</title>
+<style>
+  :root {
+    --lane-h: 120px;
+    --card-w: 150px;
+    --card-h: 90px;
+    --sidebar-w: 150px;
+    --ruler-h: 46px;
+    --fan-step: 27px;
+    --sb-size: 14px;   /* scrollbar thickness */
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #f4f5f7;
+    color: #1a1a1a;
+    overflow: hidden;
+  }
+
+  /* Full-viewport app frame */
+  #app {
+    position: fixed;
+    inset: 0;
+  }
+
+  /* Sticky top ruler, pinned to viewport top, outside the panned layer */
+  #ruler {
+    position: absolute;
+    top: 0;
+    left: var(--sidebar-w);
+    right: var(--sb-size);
+    height: var(--ruler-h);
+    background: #23272e;
+    color: #fff;
+    z-index: 600;
+    overflow: hidden;
+    border-bottom: 1px solid #11141a;
+  }
+  #ruler .tick {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-left: 1px solid rgba(255,255,255,0.18);
+    padding-left: 5px;
+    font-size: 11px;
+    color: #c7cdd7;
+    white-space: pre;
+    padding-top: 4px;
+    line-height: 1.15;
+  }
+  #ruler .tick.major { border-left-color: rgba(255,255,255,0.42); color: #fff; font-weight: 600; }
+  #ruler-readout {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    background: #d98324;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* Corner block where ruler meets sidebar */
+  #corner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--sidebar-w);
+    height: var(--ruler-h);
+    background: #1b1e24;
+    color: #fff;
+    z-index: 650;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-right: 1px solid #11141a;
+    border-bottom: 1px solid #11141a;
+  }
+
+  /* Pinned left lane sidebar, outside the pan layer, tracks vertical pan */
+  #sidebar {
+    position: absolute;
+    top: var(--ruler-h);
+    left: 0;
+    bottom: var(--sb-size);
+    width: var(--sidebar-w);
+    background: #eceef1;
+    border-right: 1px solid #d8dbe0;
+    z-index: 550;
+    overflow: hidden;
+  }
+  #sidebar-inner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    will-change: transform;
+  }
+  .side-band {
+    position: relative;
+    height: var(--lane-h);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #46505f;
+    border-bottom: 1px solid #d8dbe0;
+  }
+  .side-band .side-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 40px;
+    border-radius: 3px;
+    margin-right: 9px;
+    flex: 0 0 auto;
+  }
+
+  /* Viewport that clips the panned/zoomed content */
+  #viewport {
+    position: absolute;
+    top: var(--ruler-h);
+    left: var(--sidebar-w);
+    right: var(--sb-size);
+    bottom: var(--sb-size);
+    overflow: hidden;
+    background: #f4f5f7;
+    cursor: grab;
+  }
+  #viewport.grabbing { cursor: grabbing; }
+
+  /* The transformed layer: gridlines + lanes translate together */
+  #world {
+    position: absolute;
+    left: 0;
+    top: 0;
+    will-change: transform;
+  }
+
+  /* Gridlines background layer, shares the x mapping */
+  #grid {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  #grid .gl {
+    position: absolute;
+    top: 0;
+    width: 0;
+    border-left: 1px solid #e4e7ec;
+  }
+  #grid .gl.week { border-left-color: #d3d8df; }
+  #grid .gl.month { border-left-color: #b9c0ca; }
+
+  #lanes {
+    position: relative;
+    z-index: 1;
+  }
+  .lane {
+    position: relative;
+    height: var(--lane-h);
+    border-bottom: 1px solid #d8dbe0;
+    overflow: hidden;           /* clip fan to lane height, never wrap */
+  }
+  .lane.bg-a { background: rgba(255,255,255,0.55); }
+  .lane.bg-b { background: rgba(250,251,252,0.55); }
+
+  .day-card {
+    position: absolute;
+    top: 15px;
+    width: var(--card-w);
+    height: var(--card-h);
+    background: #fff;
+    border: 1px solid #c4c9d1;
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    overflow: hidden;
+  }
+  .day-card:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.25); z-index: 400 !important; }
+  .day-card.sig { border-color: #d98324; border-width: 2px; }
+  .day-card.sig::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #d98324;
+  }
+  .dc-date { font-size: 11px; font-weight: 700; color: #6b7280; letter-spacing: 0.02em; }
+  .dc-title {
+    font-size: 12px; line-height: 1.25; font-weight: 500;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dc-badge {
+    position: absolute; top: 5px; right: 5px;
+    background: #23272e; color: #fff; font-size: 10px; font-weight: 700;
+    border-radius: 10px; padding: 1px 6px; min-width: 18px; text-align: center;
+  }
+
+  /* Edge scrollbars */
+  .scrollbar {
+    position: absolute;
+    background: #e2e5ea;
+    z-index: 700;
+  }
+  #sb-h {
+    left: var(--sidebar-w);
+    right: var(--sb-size);
+    bottom: 0;
+    height: var(--sb-size);
+    border-top: 1px solid #cdd2d9;
+  }
+  #sb-v {
+    right: 0;
+    top: var(--ruler-h);
+    bottom: var(--sb-size);
+    width: var(--sb-size);
+    border-left: 1px solid #cdd2d9;
+  }
+  .sb-thumb {
+    position: absolute;
+    background: #9aa3b0;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .sb-thumb:hover { background: #808b9b; }
+  #sb-h .sb-thumb { top: 2px; height: calc(var(--sb-size) - 4px); }
+  #sb-v .sb-thumb { left: 2px; width: calc(var(--sb-size) - 4px); }
+  /* corner where the two scrollbars meet */
+  #sb-corner {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: var(--sb-size);
+    height: var(--sb-size);
+    background: #d5d9df;
+    z-index: 701;
+  }
+
+  /* Controls box, bottom-right, inset to clear both edge sliders */
+  #controls {
+    position: absolute;
+    right: calc(var(--sb-size) + 14px);
+    bottom: calc(var(--sb-size) + 14px);
+    z-index: 720;
+    background: #23272e;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.35);
+  }
+  #controls button {
+    background: #3a4150; color: #fff; border: 1px solid #555c6a;
+    border-radius: 5px; height: 28px; min-width: 30px; font-size: 15px; cursor: pointer;
+  }
+  #controls button:hover { background: #4a5262; }
+  #controls button#reset { font-size: 11px; padding: 0 8px; font-weight: 600; }
+  #controls .zoomval { font-size: 11px; color: #b7bdc7; min-width: 74px; text-align: center; }
+
+  /* modal */
+  #modal-backdrop {
+    display: none;
+    position: fixed; inset: 0; background: rgba(20,22,26,0.55);
+    z-index: 1000; align-items: flex-start; justify-content: center;
+    padding: 5vh 16px; overflow-y: auto;
+  }
+  #modal-backdrop.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 10px; width: min(680px, 100%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden;
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; background: #23272e; color: #fff;
+  }
+  .modal-head h2 { font-size: 15px; margin: 0; font-weight: 600; }
+  .modal-close {
+    background: transparent; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; line-height: 1; padding: 0 4px;
+  }
+  .modal-body { padding: 8px 0; max-height: 70vh; overflow-y: auto; }
+  .ev { padding: 12px 18px; border-bottom: 1px solid #eceef1; }
+  .ev:last-child { border-bottom: none; }
+  .ev-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .ev-title .sigdot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: #d98324; margin-right: 6px; vertical-align: middle;
+  }
+  .ev-meta { font-size: 11px; color: #6b7280; margin-bottom: 5px; }
+  .ev-desc { font-size: 13px; line-height: 1.4; color: #333; }
+  .ev-url { font-size: 12px; margin-top: 5px; }
+  .ev-url a { color: #2563c0; word-break: break-all; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="corner">Timeline</div>
+  <div id="ruler"><div id="ruler-readout"></div></div>
+  <div id="sidebar"><div id="sidebar-inner"></div></div>
+
+  <div id="viewport">
+    <div id="world">
+      <div id="grid"></div>
+      <div id="lanes"></div>
+    </div>
+  </div>
+
+  <div id="sb-h" class="scrollbar"><div class="sb-thumb" id="thumb-h"></div></div>
+  <div id="sb-v" class="scrollbar"><div class="sb-thumb" id="thumb-v"></div></div>
+  <div id="sb-corner"></div>
+
+  <div id="controls">
+    <button id="zoom-out" title="Zoom out">&minus;</button>
+    <span class="zoomval" id="zoomval">8 px/day</span>
+    <button id="zoom-in" title="Zoom in">+</button>
+    <button id="reset" title="Full-span overview">reset</button>
+  </div>
+</div>
+
+<div id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="modal-title"></h2>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+window.__ERRLOG = [];
+window.addEventListener("error", e => window.__ERRLOG.push(String(e.message)));
+window.addEventListener("unhandledrejection", e => window.__ERRLOG.push(String(e.reason)));
+
+const LANES = [
+  { key: "openai-technical-report-t1", label: "OpenAI report (our tier 1)", tint: "#c0392b" },
+  { key: "openai-technical-report-t2", label: "OpenAI report (our tier 2)", tint: "#e07b39" },
+  { key: "openai-technical-report-t3", label: "OpenAI report (our tier 3)", tint: "#d9a441" },
+  { key: "openai-blog",                label: "OpenAI blog",     tint: "#2f79c0" },
+  { key: "metr-figure",                label: "METR figures",    tint: "#5aa06f" },
+  { key: "metr-narrative",             label: "METR narrative",  tint: "#3d8b5f" },
+  { key: "felonybench",                label: "Felony Bench",    tint: "#8e44ad" },
+];
+const CARD_W = 150;
+const FAN_STEP = 27;
+const LANE_H = 120;
+const MS_DAY = 86400000;
+const PX_MIN = 8, PX_MAX = 160;
+
+let PX_PER_DAY = 8;
+let panX = 0;   // world x-translation (<= 0 usually; content shifts left)
+let panY = 0;   // world y-translation
+
+let buckets = [];
+let minDayStart = null;
+let maxDayIndex = 0;
+
+// --- CSV parser (handles quoted fields with commas / quotes) ---
+function parseCSV(text) {
+  const rows = [];
+  let field = "", row = [], inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i+1] === '"') { field += '"'; i++; }
+        else inQ = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ""; }
+      else if (c === '\n') { row.push(field); rows.push(row); field = ""; row = []; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function parseISO(iso) {
+  let s = iso.trim();
+  if (!/[Zz]$/.test(s)) s += "Z";
+  return new Date(s);
+}
+function dayStartUTC(d) {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtDate(msDayStart) {
+  const d = new Date(msDayStart);
+  return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate();
+}
+function fmtDateFull(msDayStart) {
+  const d = new Date(msDayStart);
+  return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate() + ", " + d.getUTCFullYear();
+}
+function fmtTime(d) {
+  const hh = String(d.getUTCHours()).padStart(2,"0");
+  const mm = String(d.getUTCMinutes()).padStart(2,"0");
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")} ${hh}:${mm} UTC`;
+}
+
+// pick headline row: significant==yes first, else lowest tier, else earliest
+function pickHeadline(rows) {
+  const sorted = [...rows].sort((a,b) => {
+    const sa = a.significant === "yes" ? 0 : 1;
+    const sb = b.significant === "yes" ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    const ta = a.tier ? parseInt(a.tier,10) : 99;
+    const tb = b.tier ? parseInt(b.tier,10) : 99;
+    if (ta !== tb) return ta - tb;
+    return a.t - b.t;
+  });
+  return sorted[0];
+}
+
+function ingest(rows) {
+  const header = rows[0];
+  const idx = {};
+  header.forEach((h,i) => idx[h.trim()] = i);
+  const recs = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.length < 2 || !row[idx.iso]) continue;
+    const iso = row[idx.iso];
+    const d = parseISO(iso);
+    if (isNaN(d)) continue;
+    recs.push({
+      iso, t: d.getTime(), date: d,
+      raw_ts: row[idx.raw_ts] || "",
+      source: (row[idx.source] || "").trim(),
+      significant: (row[idx.significant] || "").trim(),
+      tier: (row[idx.tier] || "").trim(),
+      category: row[idx.category] || "",
+      title: row[idx.title] || "",
+      desc: row[idx.desc] || "",
+      url: (row[idx.url] || "").trim(),
+    });
+  }
+  const times = recs.map(r => dayStartUTC(r.date));
+  minDayStart = Math.min(...times);
+
+  const map = new Map();
+  for (const rec of recs) {
+    const ds = dayStartUTC(rec.date);
+    const dayIndex = Math.round((ds - minDayStart) / MS_DAY);
+    const key = dayIndex + "|" + rec.source;
+    if (!map.has(key)) {
+      map.set(key, { dayIndex, laneKey: rec.source, dayStart: ds, rows: [] });
+    }
+    map.get(key).rows.push(rec);
+  }
+  buckets = [...map.values()];
+  for (const b of buckets) {
+    b.rows.sort((a,z) => a.t - z.t);
+    b.headline = pickHeadline(b.rows);
+    b.hasSig = b.rows.some(r => r.significant === "yes");
+    b.date = fmtDate(b.dayStart);
+  }
+  maxDayIndex = Math.max(...buckets.map(b => b.dayIndex));
+}
+
+function escapeHTML(s) {
+  return (s || "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
+}
+
+// x mapping helpers
+function contentWidth() { return maxDayIndex * PX_PER_DAY + CARD_W + 40; }
+function contentHeight() { return LANES.length * LANE_H; }
+function vpWidth() { return document.getElementById("viewport").clientWidth; }
+function vpHeight() { return document.getElementById("viewport").clientHeight; }
+
+// screen x -> msDayStart. x = dayIndex*pxPerDay + panX (linear inverse)
+function screenXToMsDay(screenX) {
+  const worldX = screenX - panX;
+  const dayIndex = worldX / PX_PER_DAY;
+  return minDayStart + Math.round(dayIndex) * MS_DAY;
+}
+
+// ---- Build the lane / card DOM (fan positions depend on zoom) ----
+function buildLanes() {
+  const lanesEl = document.getElementById("lanes");
+  lanesEl.innerHTML = "";
+  const w = contentWidth();
+
+  LANES.forEach((lane, li) => {
+    const laneEl = document.createElement("div");
+    laneEl.className = "lane " + (li % 2 ? "bg-b" : "bg-a");
+    laneEl.style.width = w + "px";
+    laneEl.dataset.lane = lane.key;
+
+    const laneBuckets = buckets
+      .filter(b => b.laneKey === lane.key)
+      .sort((a,b) => a.dayIndex - b.dayIndex);
+
+    let prevPlacedX = -Infinity;
+    let fanZ = 0;
+    for (const b of laneBuckets) {
+      const baseX = b.dayIndex * PX_PER_DAY;
+      let placedX = baseX;
+      if (baseX - prevPlacedX < CARD_W) {
+        placedX = prevPlacedX + FAN_STEP;
+        fanZ += 1;
+      } else {
+        fanZ = 0;
+      }
+      const card = document.createElement("div");
+      card.className = "day-card" + (b.hasSig ? " sig" : "");
+      card.style.left = placedX + "px";
+      card.style.zIndex = 100 + fanZ;
+      card.innerHTML =
+        `<div class="dc-date">${b.date}</div>` +
+        `<div class="dc-title">${escapeHTML(b.headline.title)}</div>` +
+        (b.rows.length > 1 ? `<div class="dc-badge">${b.rows.length}</div>` : "");
+      card.addEventListener("click", () => openModal(b, lane.label));
+      laneEl.appendChild(card);
+      prevPlacedX = placedX;
+    }
+    lanesEl.appendChild(laneEl);
+  });
+
+  buildGrid(w);
+  buildSidebar();
+}
+
+// ---- Gridlines: day/week/month depending on pxPerDay ----
+function buildGrid(w) {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  grid.style.width = w + "px";
+  grid.style.height = contentHeight() + "px";
+
+  let step;
+  if (PX_PER_DAY >= 40) step = 1;        // every day
+  else if (PX_PER_DAY >= 14) step = 7;   // weekly
+  else step = 30;                        // ~monthly
+
+  for (let di = 0; di <= maxDayIndex; di++) {
+    const ds = minDayStart + di * MS_DAY;
+    const d = new Date(ds);
+    const isMonthStart = d.getUTCDate() === 1;
+    const isWeek = (di % 7) === 0;
+    let cls = "gl";
+    if (isMonthStart) cls += " month";
+    else if (isWeek) cls += " week";
+    const draw = isMonthStart || (step === 1) || (step === 7 && isWeek);
+    if (!draw) continue;
+    const gl = document.createElement("div");
+    gl.className = cls;
+    gl.style.left = (di * PX_PER_DAY) + "px";
+    gl.style.height = contentHeight() + "px";
+    grid.appendChild(gl);
+  }
+}
+
+// ---- Pinned sidebar bands ----
+function buildSidebar() {
+  const inner = document.getElementById("sidebar-inner");
+  inner.innerHTML = "";
+  for (const lane of LANES) {
+    const band = document.createElement("div");
+    band.className = "side-band";
+    band.innerHTML =
+      `<span class="side-swatch" style="background:${lane.tint}"></span>` +
+      `<span>${escapeHTML(lane.label)}</span>`;
+    inner.appendChild(band);
+  }
+}
+
+// ---- Ruler ticks: day-capped, never sub-day ----
+function renderRuler() {
+  const ruler = document.getElementById("ruler");
+  [...ruler.querySelectorAll(".tick")].forEach(t => t.remove());
+
+  const width = ruler.clientWidth;
+  let stepDays;
+  if (PX_PER_DAY >= 80) stepDays = 1;
+  else if (PX_PER_DAY >= 30) stepDays = 7;
+  else if (PX_PER_DAY >= 14) stepDays = 14;
+  else stepDays = 30;
+
+  const leftMsDay = screenXToMsDay(0);
+  const rightMsDay = screenXToMsDay(width);
+  const startDi = Math.floor((leftMsDay - minDayStart) / MS_DAY) - 1;
+  const endDi = Math.ceil((rightMsDay - minDayStart) / MS_DAY) + 1;
+
+  for (let di = Math.max(0, startDi); di <= endDi; di++) {
+    const ds = minDayStart + di * MS_DAY;
+    const d = new Date(ds);
+    const isMonthStart = d.getUTCDate() === 1;
+    const onStep = (di % stepDays) === 0;
+    if (!isMonthStart && !onStep) continue;
+    const screenX = di * PX_PER_DAY + panX;
+    if (screenX < -60 || screenX > width + 10) continue;
+    const tick = document.createElement("div");
+    tick.className = "tick" + (isMonthStart ? " major" : "");
+    tick.style.left = screenX + "px";
+    tick.textContent = isMonthStart
+      ? MONTHS[d.getUTCMonth()] + "\n" + d.getUTCDate()
+      : MONTHS[d.getUTCMonth()] + " " + d.getUTCDate();
+    ruler.appendChild(tick);
+  }
+
+  const centerMs = screenXToMsDay(width / 2);
+  document.getElementById("ruler-readout").textContent = fmtDateFull(centerMs);
+}
+
+// ---- Scrollbar thumbs reflect visible fraction + offset ----
+function renderScrollbars() {
+  const cw = contentWidth(), ch = contentHeight();
+  const vw = vpWidth(), vh = vpHeight();
+
+  const trackH = document.getElementById("sb-h").clientWidth;
+  const thumbH = document.getElementById("thumb-h");
+  const fracH = Math.min(1, vw / cw);
+  const thumbHW = Math.max(28, fracH * trackH);
+  const maxScrollX = Math.max(0, cw - vw);
+  const sFracX = maxScrollX > 0 ? (-panX / maxScrollX) : 0;
+  const thumbHLeft = sFracX * (trackH - thumbHW);
+  thumbH.style.width = thumbHW + "px";
+  thumbH.style.left = thumbHLeft + "px";
+
+  const trackV = document.getElementById("sb-v").clientHeight;
+  const thumbV = document.getElementById("thumb-v");
+  const fracV = Math.min(1, vh / ch);
+  const thumbVH = Math.max(28, fracV * trackV);
+  const maxScrollY = Math.max(0, ch - vh);
+  const sFracY = maxScrollY > 0 ? (-panY / maxScrollY) : 0;
+  const thumbVTop = sFracY * (trackV - thumbVH);
+  thumbV.style.height = thumbVH + "px";
+  thumbV.style.top = thumbVTop + "px";
+}
+
+// clamp pan so content stays reasonable
+function clampPan() {
+  const cw = contentWidth(), ch = contentHeight();
+  const vw = vpWidth(), vh = vpHeight();
+  const minPanX = Math.min(0, vw - cw);
+  const minPanY = Math.min(0, vh - ch);
+  if (panX > 0) panX = 0;
+  if (panX < minPanX) panX = minPanX;
+  if (panY > 0) panY = 0;
+  if (panY < minPanY) panY = minPanY;
+}
+
+// Single update path run on every pan/zoom (transform + chrome sync)
+function update() {
+  clampPan();
+  const world = document.getElementById("world");
+  world.style.transform = `translate(${panX}px, ${panY}px)`;
+  document.getElementById("sidebar-inner").style.transform = `translateY(${panY}px)`;
+  renderRuler();
+  renderScrollbars();
+}
+
+// ---- Zoom keeping a screen point stable ----
+function setZoom(px, anchorScreenX) {
+  const vw = vpWidth();
+  if (anchorScreenX == null) anchorScreenX = vw / 2;
+  const worldXBefore = anchorScreenX - panX;
+  const dayAtAnchor = worldXBefore / PX_PER_DAY;
+
+  PX_PER_DAY = Math.max(PX_MIN, Math.min(PX_MAX, px));
+  document.getElementById("zoomval").textContent = Math.round(PX_PER_DAY) + " px/day";
+
+  buildLanes();
+
+  const worldXAfter = dayAtAnchor * PX_PER_DAY;
+  panX = anchorScreenX - worldXAfter;
+  update();
+}
+
+function openModal(bucket, laneLabel) {
+  document.getElementById("modal-title").textContent = `${bucket.date} · ${laneLabel}`;
+  const body = document.getElementById("modal-body");
+  body.innerHTML = "";
+  for (const r of bucket.rows) {
+    const ev = document.createElement("div");
+    ev.className = "ev";
+    const meta = (r.raw_ts && r.raw_ts.trim()) ? r.raw_ts.trim() : fmtTime(r.date);
+    ev.innerHTML =
+      `<div class="ev-title">${r.significant === "yes" ? '<span class="sigdot"></span>' : ""}${escapeHTML(r.title)}</div>` +
+      `<div class="ev-meta">${escapeHTML(meta)}${r.tier ? " · tier " + escapeHTML(r.tier) : ""}${r.category ? " · " + escapeHTML(r.category) : ""}</div>` +
+      `<div class="ev-desc">${escapeHTML(r.desc)}</div>` +
+      (r.url ? `<div class="ev-url"><a href="${escapeHTML(r.url)}" target="_blank" rel="noopener">${escapeHTML(r.url)}</a></div>` : "");
+    body.appendChild(ev);
+  }
+  document.getElementById("modal-backdrop").classList.add("open");
+}
+function closeModal() {
+  document.getElementById("modal-backdrop").classList.remove("open");
+}
+
+// ---- Wiring ----
+function wire() {
+  const viewport = document.getElementById("viewport");
+
+  document.getElementById("zoom-in").addEventListener("click", () => setZoom(PX_PER_DAY * 1.3));
+  document.getElementById("zoom-out").addEventListener("click", () => setZoom(PX_PER_DAY / 1.3));
+  document.getElementById("reset").addEventListener("click", () => {
+    PX_PER_DAY = PX_MIN;
+    panX = 0; panY = 0;
+    document.getElementById("zoomval").textContent = PX_PER_DAY + " px/day";
+    buildLanes();
+    update();
+  });
+
+  // wheel: two-finger swipe PANS (deltaX -> time, deltaY -> lanes);
+  // pinch (macOS reports it as a wheel event with ctrlKey) ZOOMS,
+  // anchored under the cursor. The +/- buttons are the other zoom entry.
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    if (e.ctrlKey) {
+      // pinch-to-zoom, keep the point under the cursor fixed
+      const rect = viewport.getBoundingClientRect();
+      const anchorX = e.clientX - rect.left;
+      const factor = e.deltaY < 0 ? 1.12 : (1 / 1.12);
+      setZoom(PX_PER_DAY * factor, anchorX);
+      return;
+    }
+    // horizontal swipe pans time, vertical swipe pans lanes
+    panX -= e.deltaX;
+    panY -= e.deltaY;
+    update();
+  }, { passive: false });
+
+  // drag-to-pan on canvas -> moves thumbs (via update)
+  let dragging = false, lastX = 0, lastY = 0, moved = false;
+  viewport.addEventListener("mousedown", (e) => {
+    dragging = true; moved = false;
+    lastX = e.clientX; lastY = e.clientY;
+    viewport.classList.add("grabbing");
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    panX += dx; panY += dy;
+    lastX = e.clientX; lastY = e.clientY;
+    update();
+  });
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+    viewport.classList.remove("grabbing");
+  });
+  // suppress card click if it was a drag
+  viewport.addEventListener("click", (e) => {
+    if (moved) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
+
+  dragThumb("thumb-h", "sb-h", "x");
+  dragThumb("thumb-v", "sb-v", "y");
+
+  document.getElementById("modal-close").addEventListener("click", closeModal);
+  document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+    if (e.target.id === "modal-backdrop") closeModal();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+  window.addEventListener("resize", () => { buildLanes(); update(); });
+}
+
+function dragThumb(thumbId, trackId, axis) {
+  const thumb = document.getElementById(thumbId);
+  const track = document.getElementById(trackId);
+  let dragging = false, start = 0, startPan = 0;
+  thumb.addEventListener("mousedown", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dragging = true;
+    start = (axis === "x") ? e.clientX : e.clientY;
+    startPan = (axis === "x") ? panX : panY;
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const cw = contentWidth(), ch = contentHeight();
+    const vw = vpWidth(), vh = vpHeight();
+    if (axis === "x") {
+      const trackLen = track.clientWidth - thumb.clientWidth;
+      const maxScroll = Math.max(0, cw - vw);
+      const delta = e.clientX - start;
+      const panDelta = trackLen > 0 ? -(delta / trackLen) * maxScroll : 0;
+      panX = startPan + panDelta;
+    } else {
+      const trackLen = track.clientHeight - thumb.clientHeight;
+      const maxScroll = Math.max(0, ch - vh);
+      const delta = e.clientY - start;
+      const panDelta = trackLen > 0 ? -(delta / trackLen) * maxScroll : 0;
+      panY = startPan + panDelta;
+    }
+    update();
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
+}
+
+fetch("timeline-events.csv")
+  .then(r => r.text())
+  .then(text => {
+    ingest(parseCSV(text));
+    buildLanes();
+    update();
+    wire();
+    window.__TL = {
+      cardCount: () => document.querySelectorAll(".day-card").length,
+      laneCount: () => document.querySelectorAll(".lane").length,
+      densest: () => Math.max(...buckets.map(b => b.rows.length)),
+      bucketCount: buckets.length,
+      pxPerDay: () => PX_PER_DAY,
+      panX: () => panX, panY: () => panY,
+      setZoom, update,
+      panBy: (dx, dy) => { panX += dx; panY += dy; update(); },
+      thumbHLeft: () => parseFloat(document.getElementById("thumb-h").style.left) || 0,
+      thumbVTop: () => parseFloat(document.getElementById("thumb-v").style.top) || 0,
+      rulerTicks: () => [...document.querySelectorAll("#ruler .tick")].map(t => t.textContent),
+      contentWidth, vpWidth,
+    };
+    console.log("[timeline] cards", document.querySelectorAll(".day-card").length,
+                "lanes", document.querySelectorAll(".lane").length,
+                "buckets", buckets.length);
+  })
+  .catch(e => console.error("[timeline] load error", e));
+</script>
+</body>
+</html>

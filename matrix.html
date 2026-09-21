@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>AI Incident Reporting, on trial - the scored matrix</title>
+<style>
+  :root {
+    --chrome: #23272e;
+    --chrome-2: #1b1e24;
+    --accent: #d98324;
+    --bg: #f4f5f7;
+    --ink: #1a1a1a;
+    --muted: #6b7280;
+    --line: #d8dbe0;
+    --earned: #2f79c0;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 28px 28px 40px;
+  }
+
+  header.page {
+    max-width: 1100px;
+    margin: 0 auto 18px;
+  }
+  header.page h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  header.page .sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0;
+  }
+  header.page .trap {
+    margin-top: 12px;
+    background: var(--chrome);
+    color: #fff;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    border-left: 4px solid var(--accent);
+  }
+  header.page .trap b { color: var(--accent); }
+  header.page .trap i { font-style: italic; color: #fff; }
+  header.page .trap-2 { margin-top: 8px; background: #2c313a; border-left-color: #6b7280; }
+  header.page .trap-2 b { color: #cfd4db; }
+
+  /* containment (outcome) row, pinned under the incident headers */
+  tr.contain-row th.crit {
+    background: #eef1f5; color: #46505f; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 12px 8px 16px;
+  }
+  tr.contain-row td.contain {
+    text-align: center; vertical-align: middle; padding: 8px 6px; background: #eef1f5;
+    font-size: 12.5px; line-height: 1.25;
+  }
+  tr.contain-row td.contain .rk {
+    display: inline-block; font-weight: 800; font-size: 11px; letter-spacing: 0.03em;
+    border-radius: 4px; padding: 2px 8px; color: #fff;
+  }
+  tr.contain-row td.contain .rk.best  { background: #3d8b5f; }
+  tr.contain-row td.contain .rk.mid   { background: var(--accent); }
+  tr.contain-row td.contain .rk.worst { background: #c0392b; }
+  tr.contain-row td.contain .ct { display: block; color: var(--muted); margin-top: 3px; font-size: 11px; }
+
+  .wrap { max-width: 1100px; margin: 0 auto; }
+
+  table.matrix {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  table.matrix th, table.matrix td {
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  table.matrix th:last-child, table.matrix td:last-child { border-right: none; }
+  table.matrix tr:last-child td { border-bottom: none; }
+
+  thead th {
+    background: var(--chrome);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 10px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  thead th.crit-col {
+    text-align: left;
+    background: var(--chrome-2);
+    width: 220px;
+    padding-left: 16px;
+  }
+  thead th .inc-total {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-top: 3px;
+  }
+
+  th.crit {
+    text-align: left;
+    background: #fbfbfc;
+    font-weight: 600;
+    font-size: 13px;
+    color: #2a2f38;
+    padding: 12px 12px 12px 16px;
+    vertical-align: middle;
+  }
+  th.crit .cid {
+    display: inline-block;
+    min-width: 22px;
+    color: var(--muted);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  th.crit .csub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); margin-left: 22px; }
+
+  td.cell {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  td.cell:hover { background: #eef1f5; }
+  td.cell .score {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    padding: 16px 0 6px;
+    color: #2a2f38;
+  }
+  td.cell .flag {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    min-height: 14px;
+  }
+  td.cell.crack .flag { color: var(--accent); }
+  td.cell.earned .flag { color: var(--earned); }
+  td.cell.normal .flag { color: transparent; }
+
+  /* crack cells: warm tint + orange left rail */
+  td.cell.crack {
+    background: rgba(217,131,36,0.09);
+    box-shadow: inset 4px 0 0 var(--accent);
+  }
+  td.cell.crack:hover { background: rgba(217,131,36,0.16); }
+  /* earned-low cell: blue tint + blue left rail, distinct from cracks */
+  td.cell.earned {
+    background: rgba(47,121,192,0.09);
+    box-shadow: inset 4px 0 0 var(--earned);
+  }
+  td.cell.earned:hover { background: rgba(47,121,192,0.16); }
+
+  td.cell::after {
+    content: "";
+    position: absolute;
+    right: 7px; bottom: 7px;
+    width: 6px; height: 6px;
+    border-right: 1.5px solid #b7bdc7;
+    border-bottom: 1.5px solid #b7bdc7;
+    transform: rotate(-45deg);
+    opacity: 0.55;
+  }
+
+  tr.total-row th.crit { background: var(--chrome-2); color: #fff; font-size: 14px; }
+  tr.total-row th.crit .cid { color: rgba(255,255,255,0.55); }
+  tr.total-row td.tot {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 800;
+    background: var(--chrome);
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    padding: 14px 0;
+  }
+  tr.total-row td.tot small { display:block; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.6); }
+
+  .legend {
+    max-width: 1100px;
+    margin: 16px auto 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    font-size: 12px;
+    color: var(--muted);
+    align-items: center;
+  }
+  .legend .swatch {
+    display: inline-block; width: 26px; height: 14px; border-radius: 3px;
+    vertical-align: middle; margin-right: 6px;
+  }
+  .legend .sw-crack { background: rgba(217,131,36,0.16); box-shadow: inset 4px 0 0 var(--accent); }
+  .legend .sw-earned { background: rgba(47,121,192,0.16); box-shadow: inset 4px 0 0 var(--earned); }
+  .legend b { color: var(--ink); }
+
+  .rowhint {
+    max-width: 1100px; margin: 20px auto 0;
+    font-size: 13px; color: #333; line-height: 1.5;
+    background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--earned);
+    border-radius: 8px; padding: 12px 16px;
+  }
+  .rowhint b { color: var(--earned); }
+
+  /* modal, mirrors timeline.html */
+  #modal-backdrop {
+    display: none;
+    position: fixed; inset: 0; background: rgba(20,22,26,0.55);
+    z-index: 1000; align-items: flex-start; justify-content: center;
+    padding: 6vh 16px; overflow-y: auto;
+  }
+  #modal-backdrop.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 10px; width: min(640px, 100%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden;
+  }
+  .modal-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 14px 18px; background: var(--chrome); color: #fff; gap: 10px;
+  }
+  .modal-head h2 { font-size: 15px; margin: 0; font-weight: 600; line-height: 1.3; }
+  .modal-head .mh-score {
+    flex: 0 0 auto; font-size: 13px; font-weight: 700;
+    background: var(--accent); border-radius: 12px; padding: 3px 11px; white-space: nowrap;
+  }
+  .modal-head .mh-score.earned { background: var(--earned); }
+  .modal-close {
+    background: transparent; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; line-height: 1; padding: 0 4px; flex: 0 0 auto;
+  }
+  .modal-body { padding: 16px 18px 20px; }
+  .modal-body .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; border-radius: 5px; padding: 3px 9px; margin-bottom: 12px;
+  }
+  .modal-body .tag.crack { background: rgba(217,131,36,0.15); color: #a85f12; }
+  .modal-body .tag.earned { background: rgba(47,121,192,0.15); color: #1f5aa0; }
+  .modal-body .just { font-size: 14px; line-height: 1.55; color: #262b33; margin: 0 0 16px; }
+  .modal-body .quote {
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 0 0 6px;
+    font-size: 14px; line-height: 1.5; color: #1a1a1a; font-style: italic;
+  }
+  .modal-body .quote-src { font-size: 12px; color: var(--muted); margin: 0 0 16px; }
+  .modal-body .quote-src::before { content: "\2014 "; }
+  .modal-body .src-link { font-size: 12px; }
+  .modal-body .src-link a { color: #2563c0; word-break: break-all; }
+  .modal-body .src-link .lbl { color: var(--muted); display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1 id="h-title">The scored matrix</h1>
+  <p class="sub" id="h-sub"></p>
+  <div class="trap">
+    <b>This grades the disclosure, not the outcome.</b> Every cell scores how well the lab
+    <i>told the story</i>, not how bad the event was. A high total can reward having a worse
+    catastrophe to confess. Read the <b>containment</b> row against the totals: the two axes
+    nearly invert.
+  </div>
+  <div class="trap trap-2">
+    <b>The totals are a trap.</b> 37 / 24 / 17 looks like a clean ranking. The teaching is in the
+    rows. Click any cell for the score reasoning, the anchoring quote, and the primary source.
+  </div>
+</header>
+
+<div class="wrap">
+  <table class="matrix" id="matrix"></table>
+</div>
+
+<div class="legend">
+  <span><span class="swatch sw-crack"></span><b>Crack cell:</b> the score is partly the rubric's fault (cracks #1, #2, #4)</span>
+  <span><span class="swatch sw-earned"></span><b>Earned low:</b> a real, defensible 1 (Google 6b, the thesis anchor)</span>
+</div>
+
+<div class="rowhint">
+  <b>Watch this row-pair:</b> Google holds the set's <b>only 6a = 5</b> and the <b>only 6b = 1</b>.
+  It did the responsible-notification part better than anyone and the publish part worse than anyone.
+  That single row-pair is the whole thesis in two cells.
+</div>
+
+<div id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="modal-title"></h2>
+      <span class="mh-score" id="modal-score"></span>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+window.__ERRLOG = [];
+window.addEventListener("error", e => window.__ERRLOG.push(String(e.message)));
+window.addEventListener("unhandledrejection", e => window.__ERRLOG.push(String(e.reason)));
+
+let DATA = null;
+
+function esc(s) {
+  return (s || "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
+}
+
+function build() {
+  document.getElementById("h-title").textContent = DATA.meta.title;
+  document.getElementById("h-sub").textContent = DATA.meta.subtitle;
+
+  const incidents = DATA.incidents;
+  const table = document.getElementById("matrix");
+  table.innerHTML = "";
+
+  // header
+  const thead = document.createElement("thead");
+  const htr = document.createElement("tr");
+  const corner = document.createElement("th");
+  corner.className = "crit-col";
+  corner.textContent = "Criterion";
+  htr.appendChild(corner);
+  for (const inc of incidents) {
+    const th = document.createElement("th");
+    th.innerHTML = esc(inc.label) + `<span class="inc-total">${inc.total} / ${DATA.meta.max_total}</span>`;
+    htr.appendChild(th);
+  }
+  thead.appendChild(htr);
+  table.appendChild(thead);
+
+  // body
+  const tbody = document.createElement("tbody");
+
+  // containment (outcome) row: the OTHER axis, so nobody reads the totals as outcomes
+  const RANK_LABEL = { best: "BEST", mid: "MIDDLE", worst: "WORST" };
+  const conr = document.createElement("tr");
+  conr.className = "contain-row";
+  const conTh = document.createElement("th");
+  conTh.className = "crit";
+  conTh.textContent = "Containment (outcome)";
+  conr.appendChild(conTh);
+  for (const inc of incidents) {
+    const td = document.createElement("td");
+    td.className = "contain";
+    const rk = inc.containment || "mid";
+    td.innerHTML = `<span class="rk ${rk}">${RANK_LABEL[rk] || ""}</span>` +
+                   (inc.containment_note ? `<span class="ct">${esc(inc.containment_note)}</span>` : "");
+    conr.appendChild(td);
+  }
+  tbody.appendChild(conr);
+
+  for (const crit of DATA.criteria) {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.className = "crit";
+    th.innerHTML = `<span class="cid">${esc(crit.id)}</span>${esc(crit.name)}` +
+                   (crit.sub ? `<span class="csub">${esc(crit.sub)}</span>` : "");
+    tr.appendChild(th);
+    for (const inc of incidents) {
+      const cell = crit.cells[inc.key];
+      const td = document.createElement("td");
+      td.className = "cell " + (cell.type || "normal");
+      let flagTxt = "";
+      if (cell.type === "crack") flagTxt = "crack #" + cell.crack;
+      else if (cell.type === "earned") flagTxt = "earned";
+      td.innerHTML = `<div class="score">${cell.score}</div><span class="flag">${flagTxt}</span>`;
+      td.addEventListener("click", () => openCell(crit, inc, cell));
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  // totals
+  const totr = document.createElement("tr");
+  totr.className = "total-row";
+  const totTh = document.createElement("th");
+  totTh.className = "crit";
+  totTh.innerHTML = `<span class="cid"></span>TOTAL`;
+  totr.appendChild(totTh);
+  for (const inc of incidents) {
+    const td = document.createElement("td");
+    td.className = "tot";
+    td.innerHTML = `${inc.total}<small>of ${DATA.meta.max_total}</small>`;
+    totr.appendChild(td);
+  }
+  tbody.appendChild(totr);
+  table.appendChild(tbody);
+}
+
+function openCell(crit, inc, cell) {
+  const title = document.getElementById("modal-title");
+  title.textContent = `${crit.id}. ${crit.name} · ${inc.label}`;
+
+  const scoreEl = document.getElementById("modal-score");
+  scoreEl.textContent = `${cell.score} / ${DATA.meta.max_per_cell}`;
+  scoreEl.className = "mh-score" + (cell.type === "earned" ? " earned" : "");
+
+  const body = document.getElementById("modal-body");
+  let tag = "";
+  if (cell.type === "crack") tag = `<span class="tag crack">CSET crack #${cell.crack}</span>`;
+  else if (cell.type === "earned") tag = `<span class="tag earned">Earned low, not a crack</span>`;
+
+  body.innerHTML =
+    tag +
+    `<p class="just">${esc(cell.justification)}</p>` +
+    (cell.quote ? `<p class="quote">“${esc(cell.quote)}”</p>` : "") +
+    (cell.quote_source ? `<p class="quote-src">${esc(cell.quote_source)}</p>` : "") +
+    (cell.url ? `<div class="src-link"><span class="lbl">Primary source</span><a href="${esc(cell.url)}" target="_blank" rel="noopener">${esc(cell.url)}</a></div>` : "");
+
+  document.getElementById("modal-backdrop").classList.add("open");
+}
+function closeModal() {
+  document.getElementById("modal-backdrop").classList.remove("open");
+}
+
+function wire() {
+  document.getElementById("modal-close").addEventListener("click", closeModal);
+  document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+    if (e.target.id === "modal-backdrop") closeModal();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+}
+
+fetch("scores.json")
+  .then(r => r.json())
+  .then(json => {
+    DATA = json;
+    build();
+    wire();
+    window.__MX = {
+      cellCount: () => document.querySelectorAll("td.cell").length,
+      crackCount: () => document.querySelectorAll("td.cell.crack").length,
+      earnedCount: () => document.querySelectorAll("td.cell.earned").length,
+      totals: () => DATA.incidents.map(i => i.total),
+      openFirst: () => document.querySelector("td.cell").click(),
+    };
+    console.log("[matrix] cells", document.querySelectorAll("td.cell").length,
+                "cracks", document.querySelectorAll("td.cell.crack").length,
+                "earned", document.querySelectorAll("td.cell.earned").length);
+  })
+  .catch(e => console.error("[matrix] load error", e));
+</script>
+</body>
+</html>
